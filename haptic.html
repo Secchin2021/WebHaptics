@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Web Haptics Experience</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 長押し時のテキスト選択を防ぐ */
+        .no-select {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        /* スクロールバーの非表示（見た目をスッキリさせるため） */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans antialiased min-h-screen">
+
+    <div class="max-w-md mx-auto p-4 flex flex-col gap-6 pb-24">
+        
+        <!-- ヘッダーと注意書き -->
+        <header class="text-center mt-6">
+            <h1 class="text-2xl font-bold text-gray-900">Web Haptics Demo</h1>
+            <p class="text-sm text-gray-500 mt-2">振動フィードバックを体験してみましょう。</p>
+        </header>
+
+        <div id="ios-warning" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded text-sm shadow-sm hidden">
+            <strong>注意:</strong> ご利用のブラウザ（またはiOSデバイス）は Vibration API をサポートしていません。視覚的なフィードバックのみが表示されます。
+        </div>
+
+        <!-- 1. タップ機能 -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all duration-200" id="tap-section">
+            <h2 class="text-lg font-semibold mb-2">1. Tap (短押し)</h2>
+            <p class="text-sm text-gray-500 mb-4">ボタンをタップすると、50msの短い振動が発生します。</p>
+            <button id="tap-btn" class="w-full bg-blue-500 hover:bg-blue-600 active:bg-blue-700 active:scale-95 text-white font-bold py-4 px-6 rounded-xl shadow transition-all duration-100 no-select">
+                Tap Me!
+            </button>
+        </section>
+
+        <!-- 2. 長押し機能 -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all duration-200" id="long-press-section">
+            <h2 class="text-lg font-semibold mb-2">2. Long Press (長押し)</h2>
+            <p class="text-sm text-gray-500 mb-4">500ms以上長押しすると、[100, 50, 100, 50, 500]msのパターンで振動します。</p>
+            <div id="long-press-zone" class="w-full bg-purple-100 border-2 border-purple-300 border-dashed text-purple-700 font-bold py-12 px-6 rounded-xl text-center cursor-pointer transition-all duration-300 no-select flex flex-col items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 256 256"><path d="M216,112v88a40,40,0,0,1-40,40H112a40.06,40.06,0,0,1-29.23-12.75l-48-52.61a16,16,0,0,1,23.6-21.52L64,159.25V40a16,16,0,0,1,32,0V96h16a8,8,0,0,1,8,8v16h8V104a16,16,0,0,1,32,0v16h8V112a16,16,0,0,1,32,0Z" opacity="0.2"></path><path d="M224,112v88a48.05,48.05,0,0,1-48,48H112a48.09,48.09,0,0,1-35.09-15.3l-48-52.61a24,24,0,0,1,35.39-32.28L72,156.4V40a24,24,0,0,1,48,0V88h8a24,24,0,0,1,48,0v8h8a24,24,0,0,1,48,0Zm-16,0a8,8,0,0,0-8-8H192v24a8,8,0,0,1-16,0V104a8,8,0,0,0-8-8H160v24a8,8,0,0,1-16,0V96a8,8,0,0,0-8-8H128v80a8,8,0,0,1-16,0V40a8,8,0,0,0-16,0V171.74l-6.43-5.59a8,8,0,0,0-11.78,1.4l-35.3,38.69A32.08,32.08,0,0,0,112,232h64a32,32,0,0,0,32-32V112Z"></path></svg>
+                Hold Here
+            </div>
+            <div class="w-full bg-gray-200 h-2 rounded-full mt-4 overflow-hidden hidden" id="progress-container">
+                <div class="bg-purple-500 h-full w-0 transition-all ease-linear duration-500" id="progress-bar"></div>
+            </div>
+        </section>
+
+        <!-- 3. スクロール機能 -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 transition-all duration-200" id="scroll-section">
+            <h2 class="text-lg font-semibold mb-2">3. Scroll (スクロール)</h2>
+            <p class="text-sm text-gray-500 mb-4">リストをスクロールすると、カリカリという短い振動(10ms)が定期的に発生します。</p>
+            <div id="scroll-area" class="h-48 overflow-y-auto bg-gray-50 border border-gray-200 rounded-xl hide-scrollbar rounded shadow-inner relative">
+                <div class="p-4 flex flex-col gap-2">
+                    <!-- JSでリストアイテムを生成 -->
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- 視覚的なフィードバック用のトースト通知 -->
+    <div id="status-toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full text-white font-medium text-sm shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-50">
+        Vibrating...
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const hasVibration = "vibrate" in navigator;
+            const iosWarning = document.getElementById('ios-warning');
+            const statusToast = document.getElementById('status-toast');
+            
+            // Vibration APIがサポートされていない場合(iOSなど)に警告を表示
+            if (!hasVibration) {
+                iosWarning.classList.remove('hidden');
+            }
+
+            // ----------------------------------------------------
+            // 共通の振動フィードバック関数
+            // ----------------------------------------------------
+            let toastTimeout;
+            const triggerHaptics = (pattern, sectionElement, colorClass = 'bg-gray-800') => {
+                // 振動の実行
+                if (hasVibration) {
+                    navigator.vibrate(pattern);
+                }
+
+                // 視覚的フィードバック（トースト）
+                const patternStr = Array.isArray(pattern) ? `[${pattern.join(', ')}]` : pattern;
+                statusToast.textContent = hasVibration 
+                    ? `Vibrating: ${patternStr}ms` 
+                    : `Simulated: ${patternStr}ms`;
+                
+                statusToast.className = `fixed bottom-8 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full text-white font-medium text-sm shadow-lg transition-opacity duration-300 pointer-events-none z-50 ${colorClass}`;
+                statusToast.classList.remove('opacity-0');
+                
+                clearTimeout(toastTimeout);
+                toastTimeout = setTimeout(() => {
+                    statusToast.classList.add('opacity-0');
+                }, 1200);
+
+                // セクションのハイライト（デスクトップ向けの視覚効果）
+                if (sectionElement) {
+                    sectionElement.classList.add('border-blue-400', 'shadow-md');
+                    setTimeout(() => {
+                        sectionElement.classList.remove('border-blue-400', 'shadow-md');
+                    }, 300);
+                }
+            };
+
+            // ----------------------------------------------------
+            // 1. タップ (短押し)
+            // ----------------------------------------------------
+            const tapBtn = document.getElementById('tap-btn');
+            const tapSection = document.getElementById('tap-section');
+            tapBtn.addEventListener('click', () => {
+                triggerHaptics(50, tapSection, 'bg-blue-600');
+            });
+
+            // ----------------------------------------------------
+            // 2. 長押し
+            // ----------------------------------------------------
+            const longPressZone = document.getElementById('long-press-zone');
+            const longPressSection = document.getElementById('long-press-section');
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            
+            let pressTimer;
+            const PRESS_DURATION = 500;
+
+            const startPress = (e) => {
+                if(e.type === 'touchstart') e.preventDefault(); // スクロール防止
+                
+                // プログレスバーのアニメーション開始
+                progressContainer.classList.remove('hidden');
+                setTimeout(() => { progressBar.style.width = '100%'; }, 10);
+                longPressZone.classList.replace('bg-purple-100', 'bg-purple-200');
+
+                pressTimer = setTimeout(() => {
+                    // 長押し成功時の複雑なパターン
+                    triggerHaptics([100, 50, 100, 50, 500], longPressSection, 'bg-purple-600');
+                    longPressZone.classList.add('scale-95', 'bg-purple-300');
+                    
+                    setTimeout(() => {
+                        longPressZone.classList.remove('scale-95', 'bg-purple-300');
+                        resetPress();
+                    }, 500);
+                }, PRESS_DURATION);
+            };
+
+            const resetPress = () => {
+                clearTimeout(pressTimer);
+                progressBar.style.width = '0%';
+                setTimeout(() => { progressContainer.classList.add('hidden'); }, 300); // トランジション待ち
+                longPressZone.classList.replace('bg-purple-200', 'bg-purple-100');
+            };
+
+            // 各種イベントリスナー登録
+            longPressZone.addEventListener('mousedown', startPress);
+            longPressZone.addEventListener('touchstart', startPress, {passive: false});
+            
+            ['mouseup', 'mouseleave', 'touchend', 'touchcancel'].forEach(evt => {
+                longPressZone.addEventListener(evt, resetPress);
+            });
+
+            // ----------------------------------------------------
+            // 3. スクロール
+            // ----------------------------------------------------
+            const scrollArea = document.getElementById('scroll-area');
+            const scrollSection = document.getElementById('scroll-section');
+            const listContainer = scrollArea.querySelector('div');
+
+            // ダミーのリストアイテムを生成
+            for (let i = 1; i <= 30; i++) {
+                const item = document.createElement('div');
+                item.className = 'bg-white p-3 rounded shadow-sm border border-gray-100 text-gray-600 font-medium text-sm flex items-center justify-between';
+                item.innerHTML = `<span>List Item ${i}</span> <span class="text-xs text-gray-400">Scroll down 👇</span>`;
+                listContainer.appendChild(item);
+            }
+
+            // スロットル関数（連続呼び出しを制限）
+            function throttle(func, limit) {
+                let inThrottle;
+                return function() {
+                    const args = arguments;
+                    const context = this;
+                    if (!inThrottle) {
+                        func.apply(context, args);
+                        inThrottle = true;
+                        setTimeout(() => inThrottle = false, limit);
+                    }
+                }
+            }
+
+            // スクロール時に非常に短い振動（10ms）を発生させる
+            // 連続してAPIを叩きすぎないよう 120ms 間隔でスロットル
+            scrollArea.addEventListener('scroll', throttle(() => {
+                // スクロール時の極小フィードバック
+                triggerHaptics(10, scrollSection, 'bg-teal-600');
+            }, 120));
+
+        });
+    </script>
+</body>
+</html>
